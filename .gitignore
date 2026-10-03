@@ -1,0 +1,45 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C / Fortran / CUDA Object and Binary Executable Files
+*.o
+*.mod
+*.x
+*.exe
+*.obj
+*.so
+*.dylib
+*.dll
+*.a
+*.lib
+*.dat
+# CMake & Build Directories
+build/
+cmake-build-*/
+.cache/
+
+# IDE & Editor Files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# CFD Simulation Logs & Temporary Output Checkpoints
+*.log
+*.tmp
+*.bak
+debug/
+backup/
+
+# Python Virtual Environments
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.venv/
