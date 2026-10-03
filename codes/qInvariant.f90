@@ -10,11 +10,11 @@ open (unit=10,file="../output/fluc.dat",status="old")
 read (10,*)
 read (10,*)
 read (10,*)
+read (10,*)
+read (10,*)
 
 do k=1,nP(3)
-	read(10,*)
 	do j=1,nP(2)
-		read(10,*)
 		do i=1,nP(1)
 			read(10,'(3(1X,F10.6),23X,3(1X,E22.15))') x(i),y(j),z(k),Ut(i,j,k,1),Ut(i,j,k,2),Ut(i,j,k,3)
 		end do

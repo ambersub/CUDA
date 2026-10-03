@@ -1,0 +1,14 @@
+{
+  "fortran_timings_sec": {
+    "prime_x": 4.762100000000001,
+    "fluc_x": 4.762100000000001,
+    "qinvariant_x": 4.762100000000001
+  },
+  "python_cuda_timings_sec": {
+    "qinvariant_vectorized": 8.003282200079411,
+    "full_input_processor_batch": 16.427621299983002
+  },
+  "speedup": {
+    "qinvariant_speedup_factor": 0.5950183788287198
+  }
+}

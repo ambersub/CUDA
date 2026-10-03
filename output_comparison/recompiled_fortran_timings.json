@@ -1,0 +1,13 @@
+{
+  "compiler": "C:\\Users\\Amber\\AppData\\Local\\Microsoft\\WinGet\\Packages\\BrechtSanders.WinLibs.MCF.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe\\mingw64\\bin\\gfortran.exe",
+  "fortran_timings_sec": {
+    "fluc": 63.80689700006042,
+    "qinvariant": 35.94773070001975,
+    "prime": 0.054365099989809096
+  },
+  "cuda_python_timings_sec": {
+    "qinvariant_cuda_python": 7.9772043999983,
+    "full_batch_processor": 7.147858400014229
+  },
+  "speedup": 4.5063068335101715
+}

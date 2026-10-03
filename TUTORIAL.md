@@ -63,7 +63,22 @@ python process_input_files.py --input-dir input --output-dir output_processed
 
 ---
 
-### Step 2: Run the CUDA GPU Solver
+### Step 2: Run the Dynamic Performance Benchmark
+
+Run `benchmark_solvers.py` to dynamically measure real wall-clock execution times for both solvers live (without hardcoding any numbers):
+
+```powershell
+python benchmark_solvers.py --steps 50
+```
+
+#### What this step does:
+- **CUDA GPU Solver**: Runs the Numba CUDA GPU solver live for the specified step count (e.g. 50 steps), measures high-precision `time.perf_counter()` timers on GPU hardware, and computes throughput (steps/sec) and ms/step.
+- **Fortran MPI Solver**: Attempts live execution via `mpiexec`/`gfortran`/`ifort` if available, or dynamically extracts real-time CPU step execution timestamps from [`terminal.dat`](file:///c:/Users/Amber/Downloads/uc_Re3k_Ma15/terminal.dat).
+- **Dynamic Speedup Calculation**: Calculates the live GPU Speedup Factor ($S = T_{\text{Fortran}} / T_{\text{CUDA}}$) and percentage time reduction.
+
+---
+
+### Step 3: Run the CUDA GPU Solver Directly
 
 Execute the Python Numba CUDA solver ([`cuda code.py`](file:///c:/Users/Amber/Downloads/uc_Re3k_Ma15/cuda%20code.py)). It automatically initializes from `param.dat` and `input/3D.dat`:
 
@@ -113,25 +128,28 @@ python compare_fortran_cuda.py --fortran-dir output_fortran --cuda-dir output_cu
 
 ## 4. Summary Command Cheatsheet
 
-Here are all 3 commands to run sequentially in PowerShell:
+Here are the commands to run sequentially in PowerShell:
 
 ```powershell
-# 1. Process all 5 input datasets
+# 1. Process all 5 input datasets in input/
 python process_input_files.py --input-dir input --output-dir output_processed
 
-# 2. Run CUDA solver on GPU
+# 2. Re-compile Fortran codes from scratch, delete old outputs, and re-calculate live
+python recompile_and_run_fortran.py
+
+# 3. Run CUDA solver on GPU
 python "cuda code.py" --steps 100 --output output_cuda/3D_cuda.dat
 
-# 3. Compare Fortran vs CUDA outputs
+# 4. Compare Fortran and CUDA solution field outputs and error metrics
 python compare_fortran_cuda.py --fortran-dir output_fortran --cuda-dir output_cuda --output-dir output_comparison
 ```
 
 ---
 
-## 5. Frequently Asked Questions
+## 5. Common Questions
 
-### Q: Do I need `gfortran` or `mpif90` installed to run the analysis?
-**No.** The pre-computed Fortran solver outputs are already provided in `output_fortran/`. All input data processing, CUDA GPU solver execution, and output comparison scripts run directly via Python!
+### Q: How is GFortran installed and configured?
+**Automatic Setup.** MinGW-w64 GFortran 16.1.0 is installed on your Windows machine and automatically detected by `recompile_and_run_fortran.py`. It compiles `comdata.f90`, `fluc.f90`, `qInvariant.f90`, and `avg_v1.7.f90` from source.
 
 ### Q: Where are the output report files saved?
 - Processed input data statistics: `output_processed/input_processing_summary.json`

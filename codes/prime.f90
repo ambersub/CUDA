@@ -12,7 +12,10 @@ INTEGER																					::i,j,k,nX,nY,nZ,p
 open(unit=12,file='../input/3D.dat')
 read(12,*) 
 read(12,*)
-read(12,104)nZ,nY,nX
+read(12,*)
+nZ = 160
+nY = 130
+nX = 130
 close(12)
 write(6,*)"Grid Points read successfully"
 write(6,'(3(1X,I3))')nX,nY,nZ
@@ -25,16 +28,15 @@ allocate(stat1(nZ,7))
 allocate(prime(nX,nY,nZ,7))
 
 !=====================read combined file===============================
-open(unit=12,file='../input/3D.dat')
+read(12,*)
+read(12,*)
 read(12,*)
 read(12,*)
 read(12,*)
 do k=1,nZ
-	read(12,*)
 	do j=1,nY
-		read(12,*)
 		do i=1,nX
-			read(12,101)x1(i),x2(j),x3(k),var(i,j,k,1),var(i,j,k,2),var(i,j,k,3),var(i,j,k,4)	&
+			read(12,*)x1(i),x2(j),x3(k),var(i,j,k,1),var(i,j,k,2),var(i,j,k,3),var(i,j,k,4)	&
 																								,var(i,j,k,5),var(i,j,k,6),var(i,j,k,7)
 		enddo
 	enddo
