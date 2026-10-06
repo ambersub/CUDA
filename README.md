@@ -2,6 +2,8 @@
 
 A high-performance Direct Numerical Simulation (DNS) solver for 3D compressible turbulent channel flow with active opposition flow control ($\text{OC}$), featuring both the original **Fortran 90 + MPI** implementation and a high-performance **Python + Numba CUDA GPU** implementation.
 
+> 📚 **Complete Documentation Suite**: Full technical specifications, architectural flowcharts, file references, library audits, and tutorials are documented in the **[`docs/`](file:///c:/Users/Amber/Downloads/uc_Re3k_Ma15/docs)** directory. Start at **[`docs/README.md`](file:///c:/Users/Amber/Downloads/uc_Re3k_Ma15/docs/README.md)**.
+
 ---
 
 ## 1. Directory Structure & File Summary
