@@ -2,7 +2,8 @@
 
 A high-performance Direct Numerical Simulation (DNS) solver for 3D compressible turbulent channel flow with active opposition flow control ($\text{OC}$), featuring both the original **Fortran 90 + MPI** implementation and a high-performance **Python + Numba CUDA GPU** implementation.
 
-> 📚 **Complete Documentation Suite**: Full technical specifications, architectural flowcharts, file references, library audits, and tutorials are documented in the **[`docs/`](file:///c:/Users/Amber/Downloads/uc_Re3k_Ma15/docs)** directory. Start at **[`docs/README.md`](file:///c:/Users/Amber/Downloads/uc_Re3k_Ma15/docs/README.md)**.
+> 📚 **Complete Documentation Suite**: Full technical specifications, architectural flowcharts, file references, library audits, and tutorials are documented in the **[`docs/`](file:///c:/Users/Amber/Downloads/uc_Re3k_Ma15/docs)** directory.  
+> 🚀 **New Device Setup Guide**: Setting this up on another device? See **[`SETUP_GUIDE.md`](file:///c:/Users/Amber/Downloads/uc_Re3k_Ma15/SETUP_GUIDE.md)** or run **`python check_setup.py`** to test your GPU and environment.
 
 ---
 
@@ -10,6 +11,12 @@ A high-performance Direct Numerical Simulation (DNS) solver for 3D compressible 
 
 | Path | Type | Description |
 | :--- | :--- | :--- |
+| [`SETUP_GUIDE.md`](file:///c:/Users/Amber/Downloads/uc_Re3k_Ma15/SETUP_GUIDE.md) | Documentation | **New Device Setup Guide**: Complete cross-device installation instructions and troubleshooting. |
+| [`check_setup.py`](file:///c:/Users/Amber/Downloads/uc_Re3k_Ma15/check_setup.py) | Verification Tool | **Automated Diagnostic Suite**: Tests Python, NVIDIA drivers, CUDA JIT, and required directories. |
+| [`requirements.txt`](file:///c:/Users/Amber/Downloads/uc_Re3k_Ma15/requirements.txt) | Dependency Config | Python package requirements for Numba CUDA GPU solver stack. |
+| [`setup_windows.bat`](file:///c:/Users/Amber/Downloads/uc_Re3k_Ma15/setup_windows.bat) | Batch Script | 1-Click automated setup script for Windows (.venv, pip, verification). |
+| [`setup_linux.sh`](file:///c:/Users/Amber/Downloads/uc_Re3k_Ma15/setup_linux.sh) | Shell Script | 1-Click automated setup script for Linux / Ubuntu / WSL2. |
+| [`param.dat.example`](file:///c:/Users/Amber/Downloads/uc_Re3k_Ma15/param.dat.example) | Template Config | Default parameters template to initialize `param.dat` when cloning on new devices. |
 | [`cuda code.py`](file:///c:/Users/Amber/Downloads/uc_Re3k_Ma15/cuda%20code.py) | Python Script | **Main Python CUDA Solver**: Accelerated 3D compressible Navier-Stokes DNS solver using Numba CUDA. |
 | [`param.dat`](file:///c:/Users/Amber/Downloads/uc_Re3k_Ma15/param.dat) | Data Config | Runtime simulation parameters ($\text{Re} = 3000$, $\text{Ma} = 1.5$, $\Delta t = 1.0\times 10^{-4}$, $\text{Pe}_x=2.0, \text{Pe}_y=1.0, \text{Pe}_z=0.1$). |
 | [`terminal.dat`](file:///c:/Users/Amber/Downloads/uc_Re3k_Ma15/terminal.dat) | Log File | Reference run log of the Fortran MPI solver ($1 \times 1 \times 4$ process topology). |

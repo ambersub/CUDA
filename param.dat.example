@@ -1,0 +1,24 @@
+Caution - Do not edit. If you do, make corresponding changes in readParam.f90
+=============================================================================
+Brief description of the present run           :unc
+Restart state (1 > combined, 2 > component)    :1
+
+No of MPI process in x-direction               :1
+No of MPI process in y-direction               :1
+No of MPI process in z-direction               :4
+List of CPUs to pin                            :0-3
+
+Reynolds Number                                :3000
+Mach Number                                    :1.5
+Timestep                                       :0.0001
+Frequency of Calculating Spatial Statistics    :100
+
+Peclet in x direction                          :2.0
+Peclet in y direction                          :1.0
+Peclet in z direction                          :0.1
+
+Debug state (0 > OFF, 1 > ON)                  :0
+Relative path of initial solution              :../input/3D.dat
+Active Compiler Flags                          :-O3
+Main code version in use                       :v1.9
+Average code version in use                    :v1.7
