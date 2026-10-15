@@ -283,8 +283,8 @@ def compare_3d_snapshots(
 
 def find_checkpoint_files(fortran_dir: str, cuda_dir: str) -> Tuple[Optional[str], Optional[str]]:
     """Finds best matching 3D checkpoint files in Fortran and CUDA directories."""
-    f_candidates = ["3D_fortran.dat", "3D008.dat", "3D001.dat", "3D.dat"]
-    c_candidates = ["3D_cuda.dat", "3D_cuda_step0.dat", "3D_cuda.dat"]
+    f_candidates = ["3D_fortran.dat", "3D.dat", "3D008.dat", "3D001.dat"]
+    c_candidates = ["3D.dat", "3D_cuda.dat", "3D_cuda_step0.dat"]
 
     fortran_file = None
     for cand in f_candidates:

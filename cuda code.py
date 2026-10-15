@@ -67,7 +67,12 @@ except Exception:
     pass
 
 import numpy as np
+import warnings
 from numba import cuda, float64, int32
+from numba.core.errors import NumbaPerformanceWarning
+
+warnings.filterwarnings("ignore", category=NumbaPerformanceWarning)
+warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 
 # ---------------------------------------------------------------------------
@@ -1053,7 +1058,7 @@ class CUDASolver:
         self.tpb3 = (8, 8, 8)
         self.bpg3 = blocks_3d((cfg.nx, cfg.ny, cfg.nz), self.tpb3)
 
-        self.tpb2 = (32, 8)
+        self.tpb2 = (16, 8)
         self.bpg2 = (
             (cfg.nx + self.tpb2[0] - 1) // self.tpb2[0],
             (cfg.ny + self.tpb2[1] - 1) // self.tpb2[1],
