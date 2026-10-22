@@ -10,6 +10,14 @@ echo " 3D Compressible CFD Solver - Automated Linux / Ubuntu / WSL2 Device Setup
 echo "==============================================================================="
 echo ""
 
+# Ensure execution in repository root directory
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+if [ -f "$SCRIPT_DIR/../cuda code.py" ]; then
+    REPO_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
+    cd "$REPO_ROOT"
+fi
+echo "[INFO] Repository Root: $(pwd)"
+
 # 1. Verify Python 3
 if ! command -v python3 &> /dev/null; then
     echo "[ERROR] python3 is not installed!"
@@ -32,15 +40,24 @@ fi
 source .venv/bin/activate
 
 # 4. Install Dependencies
+REQ_FILE="setup/requirements.txt"
+if [ ! -f "$REQ_FILE" ]; then
+    REQ_FILE="requirements.txt"
+fi
+
 echo ""
-echo "[INFO] Installing Python dependencies from requirements.txt..."
+echo "[INFO] Installing Python dependencies from $REQ_FILE..."
 python -m pip install --upgrade pip --quiet
-pip install -r requirements.txt
+pip install -r "$REQ_FILE"
 
 # 5. Default param.dat
-if [ ! -f "param.dat" ] && [ -f "param.dat.example" ]; then
-    echo "[INFO] Copying default param.dat configuration..."
-    cp param.dat.example param.dat
+if [ ! -f "param.dat" ]; then
+    if [ -f "setup/param.dat.example" ]; then
+        echo "[INFO] Copying default param.dat configuration from setup/param.dat.example..."
+        cp setup/param.dat.example param.dat
+    elif [ -f "param.dat.example" ]; then
+        cp param.dat.example param.dat
+    fi
 fi
 
 # 6. Check GFortran
@@ -56,7 +73,11 @@ echo ""
 echo "==============================================================================="
 echo " Running System & CUDA Verification Diagnostic"
 echo "==============================================================================="
-python check_setup.py
+if [ -f "setup/check_setup.py" ]; then
+    python setup/check_setup.py
+else
+    python check_setup.py
+fi
 
 echo ""
 echo "==============================================================================="

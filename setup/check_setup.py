@@ -327,16 +327,31 @@ def check_workspace_files(fix_dirs: bool = False) -> Tuple[bool, List[str]]:
     print_header("6. Workspace Structure & Dataset Integrity")
     issues = []
 
+    # Ensure we resolve files relative to the repository root
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    if os.path.exists("cuda code.py"):
+        repo_root = os.path.abspath(".")
+    elif os.path.exists(os.path.join(script_dir, "..", "cuda code.py")):
+        repo_root = os.path.abspath(os.path.join(script_dir, ".."))
+        os.chdir(repo_root)
+    else:
+        repo_root = os.path.abspath(".")
+
     # Check param.dat
-    if os.path.exists("param.dat"):
+    param_path = os.path.join(repo_root, "param.dat")
+    param_example = os.path.join(repo_root, "setup", "param.dat.example")
+    if not os.path.exists(param_example):
+        param_example = os.path.join(repo_root, "param.dat.example")
+
+    if os.path.exists(param_path):
         print_status("Simulation Config", True, "param.dat found")
-    elif os.path.exists("param.dat.example"):
+    elif os.path.exists(param_example):
         print_status("Simulation Config", True, "param.dat missing, copying from param.dat.example...", warn=True)
         try:
-            shutil.copy("param.dat.example", "param.dat")
+            shutil.copy(param_example, param_path)
             print(f"      {Colors.GREEN}--> Auto-created 'param.dat' from 'param.dat.example'{Colors.RESET}")
         except Exception:
-            issues.append("Copy param.dat.example to param.dat.")
+            issues.append("Copy setup/param.dat.example to param.dat.")
     else:
         print_status("Simulation Config", False, "param.dat not found!")
         issues.append("param.dat is required for simulation parameters.")
@@ -349,14 +364,15 @@ def check_workspace_files(fix_dirs: bool = False) -> Tuple[bool, List[str]]:
         ("python/compare_fortran_cuda.py", "Fortran vs CUDA Output Comparator"),
     ]
     for path, desc in core_files:
-        if os.path.exists(path):
+        full_path = os.path.join(repo_root, path)
+        if os.path.exists(full_path):
             print_status(desc, True, f"{path}")
         else:
             print_status(desc, False, f"Missing: {path}")
             issues.append(f"Missing core script: {path}")
 
     # Check Input Datasets
-    input_file = os.path.join("input", "3D.dat")
+    input_file = os.path.join(repo_root, "input", "3D.dat")
     if os.path.exists(input_file):
         sz_mb = os.path.getsize(input_file) / (1024 * 1024)
         print_status("3D Initial Dataset", True, f"input/3D.dat found ({sz_mb:.1f} MB)")
@@ -376,10 +392,11 @@ def check_workspace_files(fix_dirs: bool = False) -> Tuple[bool, List[str]]:
         "plots",
     ]
     for d in required_dirs:
-        if os.path.exists(d):
+        dir_path = os.path.join(repo_root, d)
+        if os.path.exists(dir_path):
             print_status(f"Directory '{d}/'", True, "Exists")
         else:
-            os.makedirs(d, exist_ok=True)
+            os.makedirs(dir_path, exist_ok=True)
             print_status(f"Directory '{d}/'", True, "Created automatically")
 
     return len(issues) == 0, issues

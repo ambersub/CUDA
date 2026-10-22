@@ -2,6 +2,8 @@
 
 This guide provides complete instructions for cloning, configuring, and verifying the **3D Compressible Turbulent Channel Flow DNS Solver** on a new device (Windows 10/11, Ubuntu/Linux, HPC Cluster, or WSL2).
 
+All setup scripts and configuration files are conveniently located in the **[`setup/`](file:///c:/Users/Amber/Downloads/uc_Re3k_Ma15/setup)** directory.
+
 ---
 
 ## 📌 Table of Contents
@@ -22,20 +24,21 @@ This guide provides complete instructions for cloning, configuring, and verifyin
 
 ## 1. ⚡ Quick Start (Automated 1-Click Setup)
 
-Automated setup scripts are included in the repository to create the virtual environment, install dependencies, configure default parameters, and verify GPU acceleration automatically.
+Automated setup scripts are included in the [`setup/`](file:///c:/Users/Amber/Downloads/uc_Re3k_Ma15/setup) folder to create the virtual environment, install dependencies, configure default parameters, and verify GPU acceleration automatically.
 
 ### On Windows (Command Prompt or PowerShell)
-Double-click [`setup_windows.bat`](file:///c:/Users/Amber/Downloads/uc_Re3k_Ma15/setup_windows.bat) or execute in PowerShell:
+Double-click [`setup/setup_windows.bat`](file:///c:/Users/Amber/Downloads/uc_Re3k_Ma15/setup/setup_windows.bat) or execute from the repository root:
 ```powershell
-.\setup_windows.bat
+.\setup\setup_windows.bat
 # or in PowerShell:
-powershell -ExecutionPolicy Bypass -File .\setup_windows.ps1
+powershell -ExecutionPolicy Bypass -File .\setup\setup_windows.ps1
 ```
 
 ### On Linux / Ubuntu / WSL2
+From the repository root:
 ```bash
-chmod +x setup_linux.sh
-./setup_linux.sh
+chmod +x setup/setup_linux.sh
+./setup/setup_linux.sh
 ```
 
 ---
@@ -65,13 +68,13 @@ chmod +x setup_linux.sh
    ```
 
 2. **Initialize Simulation Config (`param.dat`)**:
-   If `param.dat` is not present, create it from the provided template:
+   If `param.dat` is not present, create it from the template in `setup/`:
    ```bash
    # Windows:
-   copy param.dat.example param.dat
+   copy setup\param.dat.example param.dat
 
    # Linux:
-   cp param.dat.example param.dat
+   cp setup/param.dat.example param.dat
    ```
 
 3. **Transfer Initial Condition Datasets**:
@@ -93,7 +96,7 @@ nvidia-smi
 
 ### Step 3: Setup Python Environment
 
-Always use a 64-bit Python virtual environment:
+Always use a 64-bit Python virtual environment in the repository root:
 
 #### Windows:
 ```powershell
@@ -112,17 +115,29 @@ source .venv/bin/activate
 
 ### Step 4: Install Dependencies
 
-Install the tested scientific computing and Numba CUDA stack via [`requirements.txt`](file:///c:/Users/Amber/Downloads/uc_Re3k_Ma15/requirements.txt):
+You can install the dependencies either using the included offline wheel bundle (`setup/wheels/`) or directly via PyPI:
 
-```bash
-python -m pip install --upgrade pip
-pip install -r requirements.txt
+#### Option A: Offline Fast Install (Recommended for other PCs / No internet required)
+All 25 pre-downloaded wheel files are bundled in [`setup/wheels/`](file:///c:/Users/Amber/Desktop/uc_Re3k_Ma15/setup/wheels):
+```powershell
+pip install --no-index --find-links=setup\wheels -r setup\requirements.txt
 ```
 
+#### Option B: Online Standard Install
+```bash
+python -m pip install --upgrade pip
+pip install -r setup/requirements.txt
+```
+
+> ⚠️ **Important Note on Copying `.venv` Across PCs**:  
+> Virtual environments in Python hardcode absolute system paths (e.g., `C:\Users\<username>\...`) inside `pyvenv.cfg` and the `.exe` wrappers in `Scripts/`. If you copy the entire folder including `.venv` to another PC, Python will fail with a `Fatal error in launcher` error.  
+> **Solution**: Simply run `setup\setup_windows.bat` on the new PC. It automatically detects if a copied `.venv` has invalid paths from another machine, recreates it cleanly for that machine, and installs all packages from the offline wheel cache in seconds!
+
 #### What this installs:
-- **`numpy<2.0.0`**: Multidimensional grid operations and array allocations.
+- **`numpy==1.26.4`**: Multidimensional grid operations and array allocations (pinned < 2.0.0 for Numba compatibility).
 - **`numba` & `numba-cuda`**: High-performance Python-to-PTX GPU JIT compilation.
 - **`nvidia-cuda-nvcc-cu12` & `nvidia-cuda-nvrtc-cu12`**: In-tree CUDA compiler wheels providing `libdevice.10.bc` and runtime libraries without requiring a heavy standalone system CUDA SDK.
+- **`cuda-bindings` & `cuda-core`**: Low-level CUDA driver and runtime bindings.
 - **`pandas`**: Fast C-engine ASCII dataset parser.
 - **`scipy`**: Pearson correlation statistics.
 - **`matplotlib`**: Law-of-the-wall and turbulence profile validation plots.
@@ -150,10 +165,10 @@ sudo apt update && sudo apt install -y gfortran build-essential
 
 ### Step 6: Run Automated Diagnostics
 
-Run [`check_setup.py`](file:///c:/Users/Amber/Downloads/uc_Re3k_Ma15/check_setup.py) to automatically validate all 6 components of your new device:
+Run [`setup/check_setup.py`](file:///c:/Users/Amber/Downloads/uc_Re3k_Ma15/setup/check_setup.py) to automatically validate all 6 components of your new device:
 
 ```bash
-python check_setup.py
+python setup/check_setup.py
 ```
 
 #### What the diagnostic checks:
@@ -200,9 +215,9 @@ When transferring to a new device, check off each step:
 - [ ] `nvidia-smi` displays active NVIDIA GPU and driver version $\ge 535$
 - [ ] Python 3.10–3.12 (64-bit) installed
 - [ ] Virtual environment created and activated (`.venv`)
-- [ ] `pip install -r requirements.txt` completed with 0 errors
-- [ ] `param.dat` exists (copied from `param.dat.example`)
-- [ ] `python check_setup.py` returns `[SUCCESS]`
+- [ ] `pip install -r setup/requirements.txt` completed with 0 errors
+- [ ] `param.dat` exists (copied from `setup/param.dat.example`)
+- [ ] `python setup/check_setup.py` returns `[SUCCESS]`
 - [ ] `python "cuda code.py" --demo --steps 20` runs and finishes successfully
 - [ ] *(If running full simulations)* `input/3D.dat` copied into `input/` folder
 - [ ] *(Optional)* `gfortran --version` verified
@@ -213,7 +228,7 @@ When transferring to a new device, check off each step:
 
 ### Problem 1: `Numba CUDA cannot find libdevice.10.bc`
 - **Cause**: Numba cannot locate the math bitcode library installed by pip wheels.
-- **Solution**: The solver [`cuda code.py`](file:///c:/Users/Amber/Downloads/uc_Re3k_Ma15/cuda%20code.py) and [`check_setup.py`](file:///c:/Users/Amber/Downloads/uc_Re3k_Ma15/check_setup.py) automatically scan `site-packages/nvidia/cuda_nvcc/nvvm/libdevice/libdevice.10.bc` and set `NUMBA_CUDA_LIBDEVICE`. If needed manually, set in PowerShell:
+- **Solution**: The solver [`cuda code.py`](file:///c:/Users/Amber/Downloads/uc_Re3k_Ma15/cuda%20code.py) and [`setup/check_setup.py`](file:///c:/Users/Amber/Downloads/uc_Re3k_Ma15/setup/check_setup.py) automatically scan `site-packages/nvidia/cuda_nvcc/nvvm/libdevice/libdevice.10.bc` and set `NUMBA_CUDA_LIBDEVICE`. If needed manually, set in PowerShell:
   ```powershell
   $env:NUMBA_CUDA_LIBDEVICE = (python -c "import site, os; print(os.path.join(site.getsitepackages()[0], 'nvidia', 'cuda_nvcc', 'nvvm', 'libdevice', 'libdevice.10.bc'))")
   ```
@@ -227,9 +242,9 @@ When transferring to a new device, check off each step:
 
 ### Problem 3: `FileNotFoundError: param.dat`
 - **Cause**: `.gitignore` excludes `*.dat` files by default.
-- **Solution**: Copy `param.dat.example` to `param.dat`:
+- **Solution**: Copy `setup/param.dat.example` to `param.dat`:
   ```bash
-  copy param.dat.example param.dat
+  copy setup\param.dat.example param.dat
   ```
 
 ### Problem 4: `OutOfMemoryError: CUDA out of memory`
