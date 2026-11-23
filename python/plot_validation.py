@@ -38,7 +38,6 @@ Features:
     messages without crashing.
   - Publication-quality Matplotlib styling matching classical gnuplot enhanced benchmarks.
 
-Author: Google DeepMind Antigravity Pair Programmer
 """
 
 from __future__ import annotations

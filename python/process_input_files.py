@@ -9,7 +9,6 @@ Processes all input datasets in input/:
   4. RMSu2v2w2t2uvvt.dat  : 1D wall-normal RMS turbulence profiles (z, u_rms^2, v_rms^2, w_rms^2, T_rms^2, uv_rms, vt_rms)
   5. rhouvwtpmu.dat       : 1D wall-normal mean flow profiles (z, rho_bar, u_bar, v_bar, w_bar, T_bar, p_bar, mu_bar)
 
-Author: Google DeepMind Antigravity Pair Programmer
 """
 
 from __future__ import annotations

@@ -16,7 +16,6 @@ and uses it together with the simulated 3D flow state to obtain new results:
      comparing the simulated state against the reference mean profile.
   9. Saves structured summary report and execution metrics to output_cuda/benchmark_results.json.
 
-Author: Google DeepMind Antigravity Pair Programmer
 """
 
 from __future__ import annotations

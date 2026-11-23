@@ -11,7 +11,6 @@ Runs the Fortran analysis executables live on snapshot datasets:
 Measures real wall-clock execution time (time.perf_counter()) for Fortran and compares
 with equivalent Python / Numba CUDA vectorized processing routines.
 
-Author: Google DeepMind Antigravity Pair Programmer
 """
 
 from __future__ import annotations

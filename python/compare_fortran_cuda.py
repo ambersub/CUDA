@@ -14,7 +14,6 @@ Calculates error metrics:
   - Pearson Correlation Coefficient (r)
   - Wall-normal mean profile comparison
 
-Author: Google DeepMind Antigravity Pair Programmer
 """
 
 from __future__ import annotations

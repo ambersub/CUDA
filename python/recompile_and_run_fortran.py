@@ -4,7 +4,6 @@ Re-compiles all Fortran F90 source files from scratch using GFortran,
 deletes previous Fortran outputs, executes the compiled Fortran binaries live on Windows,
 measures real wall-clock execution time, and compares with Python/CUDA GPU times.
 
-Author: Google DeepMind Antigravity Pair Programmer
 """
 
 from __future__ import annotations

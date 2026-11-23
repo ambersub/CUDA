@@ -92,58 +92,6 @@ nvidia-smi
 ```
 *Expected output: Displays Driver Version (e.g. `576.52`) and CUDA Version (e.g. `12.x`).*
 
----
-
-### Step 3: Setup Python Environment
-
-Always use a 64-bit Python virtual environment in the repository root:
-
-#### Windows:
-```powershell
-python -m venv .venv
-.\.venv\Scripts\activate
-```
-*(If you encounter a PowerShell script execution error, run: `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`)*
-
-#### Linux / WSL2:
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
----
-
-### Step 4: Install Dependencies
-
-You can install the dependencies either using the included offline wheel bundle (`setup/wheels/`) or directly via PyPI:
-
-#### Option A: Offline Fast Install (Recommended for other PCs / No internet required)
-All 25 pre-downloaded wheel files are bundled in [`setup/wheels/`](file:///c:/Users/Amber/Desktop/uc_Re3k_Ma15/setup/wheels):
-```powershell
-pip install --no-index --find-links=setup\wheels -r setup\requirements.txt
-```
-
-#### Option B: Online Standard Install
-```bash
-python -m pip install --upgrade pip
-pip install -r setup/requirements.txt
-```
-
-> ⚠️ **Important Note on Copying `.venv` Across PCs**:  
-> Virtual environments in Python hardcode absolute system paths (e.g., `C:\Users\<username>\...`) inside `pyvenv.cfg` and the `.exe` wrappers in `Scripts/`. If you copy the entire folder including `.venv` to another PC, Python will fail with a `Fatal error in launcher` error.  
-> **Solution**: Simply run `setup\setup_windows.bat` on the new PC. It automatically detects if a copied `.venv` has invalid paths from another machine, recreates it cleanly for that machine, and installs all packages from the offline wheel cache in seconds!
-
-#### What this installs:
-- **`numpy==1.26.4`**: Multidimensional grid operations and array allocations (pinned < 2.0.0 for Numba compatibility).
-- **`numba` & `numba-cuda`**: High-performance Python-to-PTX GPU JIT compilation.
-- **`nvidia-cuda-nvcc-cu12` & `nvidia-cuda-nvrtc-cu12`**: In-tree CUDA compiler wheels providing `libdevice.10.bc` and runtime libraries without requiring a heavy standalone system CUDA SDK.
-- **`cuda-bindings` & `cuda-core`**: Low-level CUDA driver and runtime bindings.
-- **`pandas`**: Fast C-engine ASCII dataset parser.
-- **`scipy`**: Pearson correlation statistics.
-- **`matplotlib`**: Law-of-the-wall and turbulence profile validation plots.
-- **`tqdm`**: Real-time simulation progress tracking.
-
----
 
 ### Step 5: Setup GFortran Compiler (Optional)
 
