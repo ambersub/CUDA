@@ -548,6 +548,53 @@ def measure_cuda_performance(
             tke_output=tke_output,
         )
 
+        # -------------------------------------------------------------------
+        # CUDA Diagnostic Calculations (KE, massflow, rhobulk, Ubulk, tauWall)
+        # -------------------------------------------------------------------
+        print("\n" + "=" * 80)
+        print(" EXECUTING CUDA FLOW DIAGNOSTICS (KE, massflow, rhobulk, Ubulk, tauWall)")
+        print("=" * 80)
+        try:
+            # Add python directory to sys.path if not present
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            if script_dir not in sys.path:
+                sys.path.insert(0, script_dir)
+
+            import compute_diagnostics_cuda as cdc
+
+            rho_cur = var_h[..., 0]
+            u_cur = var_h[..., 1]
+            v_cur = var_h[..., 2]
+            w_cur = var_h[..., 3]
+            T_cur = var_h[..., 5]
+            dy_cur = float(solver.x2_h[1] - solver.x2_h[0]) if len(solver.x2_h) > 1 else (4.0 * math.pi / 3.0) / (cfg.ny - 1)
+
+            diag_results = cdc.calculate_diagnostics_cuda(
+                rho=rho_cur,
+                u=u_cur,
+                v=v_cur,
+                w=w_cur,
+                T=T_cur,
+                z_coords=solver.x3_h,
+                dy=dy_cur,
+                reynolds=cfg.reynolds,
+                use_gpu=True,
+            )
+            target_diag_dir = out_target_dir or "output_cuda"
+            cdc.append_diagnostic_record(target_diag_dir, solver.time_value, diag_results)
+
+            print(f"    [+] Flow diagnostics computed on GPU for t={solver.time_value:.6f}:")
+            print(f"        - Kinetic Energy (KE) : {diag_results['KE']:.7f} -> saved to {target_diag_dir}/KE.dat")
+            print(f"        - Bulk Density (rho_b): {[round(x, 5) for x in diag_results['rhobulk']]} -> saved to {target_diag_dir}/rhobulk.dat")
+            print(f"        - Bulk Velocity (U_b) : {[round(x, 5) for x in diag_results['Ubulk']]} -> saved to {target_diag_dir}/Ubulk.dat")
+            print(f"        - Bulk Mass Flow      : {[round(x, 5) for x in diag_results['massflow']]} -> saved to {target_diag_dir}/massflow.dat")
+            print(f"        - Wall Shear Stress   : Bottom={diag_results['tau_bottom']:.6f}, Top={diag_results['tau_top']:.6f}, Avg={diag_results['tau_avg']:.6f} -> saved to {target_diag_dir}/tauWall.dat")
+
+            if results_from_mean is not None:
+                results_from_mean["flow_diagnostics"] = diag_results
+        except Exception as e:
+            print(f"    [!] Warning: Error executing CUDA flow diagnostics: {e}")
+
     # Save complete benchmark & statistical analysis summary JSON
     summary_dict = {
         "num_steps_requested": num_steps,
