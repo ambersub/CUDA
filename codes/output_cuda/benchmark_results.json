@@ -1,0 +1,117 @@
+{
+  "num_steps_requested": 100,
+  "num_steps_completed": 100,
+  "interrupted": false,
+  "total_time_sec": 18.518224499995995,
+  "step_time_sec": 0.18518224499995994,
+  "steps_per_sec": 5.400085737162417,
+  "ms_per_step": 185.18224499995995,
+  "final_time_value": 2268.19499967922,
+  "final_step_index": 18963100,
+  "grid_shape": [
+    130,
+    130,
+    160
+  ],
+  "total_grid_points": 2704000,
+  "output_solution_file": "C:\\Users\\Amber\\Desktop\\uc_Re3k_Ma15\\codes\\output_cuda\\3D.dat",
+  "output_file_size_mb": 505.43226051330566,
+  "checkpoint_interval_steps": null,
+  "mean_profile_source": "c:\\Users\\Amber\\Desktop\\uc_Re3k_Ma15\\output\\mean.dat",
+  "statistics_results": {
+    "mean_source_file": "c:\\Users\\Amber\\Desktop\\uc_Re3k_Ma15\\output\\mean.dat",
+    "metrics": {
+      "rho": {
+        "MAE": 0.0021461681462824345,
+        "RMSE": 0.003179118037223816,
+        "MaxError": 0.010366082191467285,
+        "RelativeL2": 0.002997025771627621,
+        "Pearson_r": 0.9996785421521412
+      },
+      "u": {
+        "MAE": 0.01015978679060936,
+        "RMSE": 0.012671781703829765,
+        "MaxError": 0.02823793888092041,
+        "RelativeL2": 0.013912598661095541,
+        "Pearson_r": 0.9995986965897323
+      },
+      "v": {
+        "MAE": 0.002600475214421749,
+        "RMSE": 0.00356001453474164,
+        "MaxError": 0.009259376674890518,
+        "RelativeL2": 2.3519007510157084,
+        "Pearson_r": -0.2539963144866761
+      },
+      "w": {
+        "MAE": 0.0003114239370916039,
+        "RMSE": 0.0003948828380089253,
+        "MaxError": 0.0012087820796296,
+        "RelativeL2": 2.156621801810786,
+        "Pearson_r": 0.4175972985401044
+      },
+      "E": {
+        "MAE": 0.014946016483008862,
+        "RMSE": 0.01898912526667118,
+        "MaxError": 0.03455793857574463,
+        "RelativeL2": 0.010094149431302725,
+        "Pearson_r": 0.9994984261694183
+      },
+      "T": {
+        "MAE": 0.005918224807828665,
+        "RMSE": 0.006447103805840015,
+        "MaxError": 0.012446165084838867,
+        "RelativeL2": 0.00492881488574412,
+        "Pearson_r": 0.9996443069054068
+      },
+      "P": {
+        "MAE": 0.0017581600695848465,
+        "RMSE": 0.0018966504139825702,
+        "MaxError": 0.004050761461257935,
+        "RelativeL2": 0.004393424753294393,
+        "Pearson_r": 0.887366893242028
+      }
+    },
+    "created_files": {
+      "fluc_file": "C:\\Users\\Amber\\Desktop\\uc_Re3k_Ma15\\codes\\output_cuda\\fluc.dat",
+      "fluc_size_mb": 505.43229961395264,
+      "rms_file": "C:\\Users\\Amber\\Desktop\\uc_Re3k_Ma15\\codes\\output_cuda\\rms.dat",
+      "mean_file": "C:\\Users\\Amber\\Desktop\\uc_Re3k_Ma15\\codes\\output_cuda\\mean.dat",
+      "tke_file": "C:\\Users\\Amber\\Desktop\\uc_Re3k_Ma15\\codes\\output_cuda\\turb_KE.dat",
+      "mean_tke_file": "C:\\Users\\Amber\\Desktop\\uc_Re3k_Ma15\\codes\\output_cuda\\meanTKE.dat"
+    },
+    "grid_shape": [
+      130,
+      130,
+      160
+    ],
+    "time_val": 2268.19499967922,
+    "nstep_val": 18963100,
+    "flow_diagnostics": {
+      "KE": 0.855787456035614,
+      "rhobulk": [
+        0.9966768703196247,
+        0.9959125721843242,
+        0.9925068123374488,
+        0.9887760493365246,
+        0.9948741558021063
+      ],
+      "Ubulk": [
+        1.0745537731996848,
+        1.0764723732551442,
+        1.0839302564895916,
+        1.0809956658387259,
+        1.0771928443451528
+      ],
+      "massflow": [
+        1.0639297559114522,
+        1.0649696521679268,
+        1.0688148208325354,
+        1.061652115594042,
+        1.0646246137931732
+      ],
+      "tau_bottom": 0.0025431611575186253,
+      "tau_top": -0.0028333626687526703,
+      "tau_avg": 0.0026882619131356478
+    }
+  }
+}

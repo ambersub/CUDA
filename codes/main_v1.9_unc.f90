@@ -7,7 +7,7 @@ implicit none
 !=======================Variable Declaration Starts=====================
 character(len=30)	  	:: filename
 logical								:: isBlown=.false.
-integer								:: i,j,k,m,p,nstep,iter,st,nXY
+integer								:: i,j,k,m,p,nstep,nstep_end,iter,st,nXY
 integer,dimension(5)  :: plane =[5,10,70,100,125]
 double precision 			:: tStart, tEnd, tauxzL, tauxzU
 double precision 			:: time, Pe, flux,dAyz,Ayz
@@ -333,7 +333,8 @@ call mpi_sendrecv(var(bn(1),bn(2),en(3),1),1,xy1p7v,des(3),50,var(bn(1),bn(2),bn
 call mpi_sendrecv(var(bn(1),bn(2),bn(3),1),1,xy1p7v,src(3),50,var(bn(1),bn(2),en(3)+1,1),1,xy1p7v,des(3),50,mpi_comm_world,STATUS,ierr)
 
 !========================Main time loop (starts)========================
-DO WHILE (nstep < maxstep)
+nstep_end = nstep + 100
+DO WHILE (nstep < nstep_end)
 
 	if(master .and. mod(nstep,10)==0) call cpu_time(tStart)
 	nstep = nstep+1
