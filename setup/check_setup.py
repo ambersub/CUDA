@@ -33,6 +33,11 @@ import warnings
 # Suppress minor version & performance warnings for clean diagnostic output
 warnings.filterwarnings("ignore")
 os.environ.setdefault("CUDA_PYTHON_DISABLE_MAJOR_VERSION_WARNING", "1")
+# Avoid Colab/Jupyter invalid MPLBACKEND errors in headless/venv environments
+if "matplotlib_inline" in os.environ.get("MPLBACKEND", ""):
+    os.environ["MPLBACKEND"] = "Agg"
+else:
+    os.environ.setdefault("MPLBACKEND", "Agg")
 
 # Ensure UTF-8 output on Windows consoles
 if hasattr(sys.stdout, "reconfigure"):
@@ -129,7 +134,11 @@ def check_python_packages() -> Tuple[bool, List[str]]:
         try:
             mod = __import__(pkg_name)
             ver = getattr(mod, "__version__", "installed")
-            print_status(desc, True, f"v{ver}")
+            if pkg_name == "numpy" and ver != "installed" and int(ver.split(".")[0]) >= 2:
+                print_status(desc, False, f"v{ver} (NumPy 2.x removed np.row_stack needed by Numba CUDA)")
+                issues.append("NumPy 2.x incompatible with Numba CUDA: run 'pip install \"numpy<2\"'")
+            else:
+                print_status(desc, True, f"v{ver}")
         except ImportError:
             print_status(desc, False, "Not installed")
             issues.append(f"Missing '{pkg_name}': run 'pip install -r requirements.txt'")
@@ -464,7 +473,7 @@ def main():
         print(f"\n{Colors.BOLD}{Colors.RED} [INCOMPLETE] Please address the following items:{Colors.RESET}")
         for i, iss in enumerate(all_issues, 1):
             print(f"   {i}. {iss}")
-        print(f"\n Refer to {Colors.BOLD}SETUP_GUIDE.md{Colors.RESET} for step-by-step instructions.\n")
+        print(f"\n Refer to {Colors.BOLD}docs/SETUP_GUIDE.md{Colors.RESET} for step-by-step instructions.\n")
 
 
 if __name__ == "__main__":
