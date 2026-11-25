@@ -32,314 +32,17 @@ try:
 except Exception:
     CUDA_AVAILABLE = False
 
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+if _THIS_DIR not in sys.path:
+    sys.path.insert(0, _THIS_DIR)
 
-# ---------------------------------------------------------------------------
-# CUDA Flow Diagnostics
-# ---------------------------------------------------------------------------
+import compute_diagnostics_cuda as cdc
 
-if CUDA_AVAILABLE:
-    @cuda.jit
-    def kernel_kinetic_energy(u, v, w, out_ke, nx, ny, nz):
-        i, j, k = cuda.grid(3)
-        if i < nx and j < ny and k < nz:
-            out_ke[i, j, k] = u[i, j, k] ** 2 + v[i, j, k] ** 2 + w[i, j, k] ** 2
-
-    @cuda.jit
-    def kernel_plane_quads(rho, u, plane_idx, out_rho_quad, out_mass_quad, out_u_quad, ny, nz):
-        j, k = cuda.grid(2)
-        if j < ny - 1 and k < nz - 1:
-            p = plane_idx
-            r00 = rho[p, j, k]
-            r01 = rho[p, j + 1, k]
-            r10 = rho[p, j, k + 1]
-            r11 = rho[p, j + 1, k + 1]
-            u00 = u[p, j, k]
-            u01 = u[p, j + 1, k]
-            u10 = u[p, j, k + 1]
-            u11 = u[p, j + 1, k + 1]
-            out_rho_quad[j, k] = 0.25 * (r00 + r01 + r10 + r11)
-            out_mass_quad[j, k] = 0.25 * (r00 * u00 + r01 * u01 + r10 * u10 + r11 * u11)
-            out_u_quad[j, k] = 0.25 * (u00 + u01 + u10 + u11)
-
-    @cuda.jit
-    def kernel_wall_shear(u, temperature, f0, f1, f2, b0, b1, b2, inv_re,
-                          out_tau_bottom, out_tau_top, nx, ny, nz):
-        i, j = cuda.grid(2)
-        if i < nx and j < ny:
-            mu_bottom = temperature[i, j, 0] ** 0.7
-            dudz_bottom = f0 * u[i, j, 0] + f1 * u[i, j, 1] + f2 * u[i, j, 2]
-            out_tau_bottom[i, j] = mu_bottom * dudz_bottom * inv_re
-            mu_top = temperature[i, j, nz - 1] ** 0.7
-            dudz_top = b0 * u[i, j, nz - 1] + b1 * u[i, j, nz - 2] + b2 * u[i, j, nz - 3]
-            out_tau_top[i, j] = mu_top * dudz_top * inv_re
-
-
-def compute_wall_coefficients(
-    z_coords: np.ndarray,
-) -> Tuple[float, float, float, float, float, float]:
-    dz1 = z_coords[1] - z_coords[0]
-    alpha_bottom = (z_coords[2] - z_coords[1]) / dz1
-    tmp_bottom = dz1 * alpha_bottom * (alpha_bottom + 1.0)
-    f0 = (1.0 - (alpha_bottom + 1.0) ** 2) / tmp_bottom
-    f1 = (alpha_bottom + 1.0) ** 2 / tmp_bottom
-    f2 = -1.0 / tmp_bottom
-
-    dz_top = z_coords[-1] - z_coords[-2]
-    alpha_top = (z_coords[-2] - z_coords[-3]) / dz_top
-    tmp_top = dz_top * alpha_top * (alpha_top + 1.0)
-    b0 = ((alpha_top + 1.0) ** 2 - 1.0) / tmp_top
-    b1 = -(alpha_top + 1.0) ** 2 / tmp_top
-    b2 = 1.0 / tmp_top
-    return f0, f1, f2, b0, b1, b2
-
-
-def calculate_diagnostics_cuda(
-    rho: np.ndarray,
-    u: np.ndarray,
-    v: np.ndarray,
-    w: np.ndarray,
-    temperature: np.ndarray,
-    z_coords: np.ndarray,
-    dy: float,
-    planes: Optional[List[int]] = None,
-    reynolds: float = 3000.0,
-    use_gpu: bool = True,
-) -> Dict[str, Any]:
-    nx, ny, nz = u.shape
-    if nz < 3 or len(z_coords) != nz:
-        raise ValueError("Diagnostics require at least three z levels matching the flow arrays.")
-    if planes is None:
-        planes = [min(idx, nx - 1) for idx in [4, 9, 69, 99, 124]]
-    if any(plane < 0 or plane >= nx for plane in planes):
-        raise ValueError(f"Monitoring plane indices must be between 0 and {nx - 1}.")
-
-    area = z_coords[-1] * (dy * (ny - 1))
-    dz_arr = np.diff(z_coords)
-    inv_re = 1.0 / reynolds
-    f0, f1, f2, b0, b1, b2 = compute_wall_coefficients(z_coords)
-
-    if use_gpu and CUDA_AVAILABLE:
-        try:
-            threads_3d = (8, 8, 8)
-            blocks_3d = ((nx + 7) // 8, (ny + 7) // 8, (nz + 7) // 8)
-            d_u = cuda.to_device(np.ascontiguousarray(u, dtype=np.float64))
-            d_v = cuda.to_device(np.ascontiguousarray(v, dtype=np.float64))
-            d_w = cuda.to_device(np.ascontiguousarray(w, dtype=np.float64))
-            d_ke = cuda.device_array((nx, ny, nz), dtype=np.float64)
-            kernel_kinetic_energy[blocks_3d, threads_3d](d_u, d_v, d_w, d_ke, nx, ny, nz)
-            cuda.synchronize()
-            ke_val = float(np.mean(d_ke.copy_to_host()))
-
-            threads_2d = (16, 16)
-            blocks_2d = ((nx + 15) // 16, (ny + 15) // 16)
-            d_temperature = cuda.to_device(np.ascontiguousarray(temperature, dtype=np.float64))
-            d_tau_bottom = cuda.device_array((nx, ny), dtype=np.float64)
-            d_tau_top = cuda.device_array((nx, ny), dtype=np.float64)
-            kernel_wall_shear[blocks_2d, threads_2d](
-                d_u, d_temperature, f0, f1, f2, b0, b1, b2, inv_re,
-                d_tau_bottom, d_tau_top, nx, ny, nz,
-            )
-            cuda.synchronize()
-            tau_bottom = float(np.mean(d_tau_bottom.copy_to_host()))
-            tau_top = float(np.mean(d_tau_top.copy_to_host()))
-
-            d_rho = cuda.to_device(np.ascontiguousarray(rho, dtype=np.float64))
-            threads_plane = (16, 16)
-            blocks_plane = ((ny - 1 + 15) // 16, (nz - 1 + 15) // 16)
-            quad_shape = (ny - 1, nz - 1)
-            d_rho_quad = cuda.device_array(quad_shape, dtype=np.float64)
-            d_mass_quad = cuda.device_array(quad_shape, dtype=np.float64)
-            d_u_quad = cuda.device_array(quad_shape, dtype=np.float64)
-            d_area = dy * dz_arr[None, :]
-            rhobulk, ubulk, massflow = [], [], []
-            for plane in planes:
-                kernel_plane_quads[blocks_plane, threads_plane](
-                    d_rho, d_u, plane, d_rho_quad, d_mass_quad, d_u_quad, ny, nz
-                )
-                cuda.synchronize()
-                rho_quad = d_rho_quad.copy_to_host()
-                mass_quad = d_mass_quad.copy_to_host()
-                u_quad = d_u_quad.copy_to_host()
-                rhobulk.append(float(np.sum(rho_quad * d_area) / area))
-                massflow.append(float(np.sum(mass_quad * d_area) / area))
-                ubulk.append(float(np.sum(u_quad * d_area) / area))
-            return {
-                "KE": ke_val,
-                "rhobulk": rhobulk,
-                "Ubulk": ubulk,
-                "massflow": massflow,
-                "tau_bottom": tau_bottom,
-                "tau_top": tau_top,
-                "tau_avg": (tau_bottom - tau_top) / 2.0,
-            }
-        except Exception as exc:
-            print(f"    [!] CUDA diagnostic kernel fallback to CPU vectorization: {exc}")
-
-    ke_val = float(np.mean(u ** 2 + v ** 2 + w ** 2))
-    mu_bottom = temperature[:, :, 0] ** 0.7
-    dudz_bottom = f0 * u[:, :, 0] + f1 * u[:, :, 1] + f2 * u[:, :, 2]
-    tau_bottom = float(np.mean(mu_bottom * dudz_bottom * inv_re))
-    mu_top = temperature[:, :, -1] ** 0.7
-    dudz_top = b0 * u[:, :, -1] + b1 * u[:, :, -2] + b2 * u[:, :, -3]
-    tau_top = float(np.mean(mu_top * dudz_top * inv_re))
-
-    d_area = dy * dz_arr[None, :]
-    rhobulk, ubulk, massflow = [], [], []
-    for plane in planes:
-        rho_plane = rho[plane]
-        u_plane = u[plane]
-        rho_quad = 0.25 * (
-            rho_plane[:-1, :-1] + rho_plane[1:, :-1] +
-            rho_plane[:-1, 1:] + rho_plane[1:, 1:]
-        )
-        u_quad = 0.25 * (
-            u_plane[:-1, :-1] + u_plane[1:, :-1] +
-            u_plane[:-1, 1:] + u_plane[1:, 1:]
-        )
-        mass_quad = 0.25 * (
-            rho_plane[:-1, :-1] * u_plane[:-1, :-1] +
-            rho_plane[1:, :-1] * u_plane[1:, :-1] +
-            rho_plane[:-1, 1:] * u_plane[:-1, 1:] +
-            rho_plane[1:, 1:] * u_plane[1:, 1:]
-        )
-        rhobulk.append(float(np.sum(rho_quad * d_area) / area))
-        massflow.append(float(np.sum(mass_quad * d_area) / area))
-        ubulk.append(float(np.sum(u_quad * d_area) / area))
-    return {
-        "KE": ke_val,
-        "rhobulk": rhobulk,
-        "Ubulk": ubulk,
-        "massflow": massflow,
-        "tau_bottom": tau_bottom,
-        "tau_top": tau_top,
-        "tau_avg": (tau_bottom - tau_top) / 2.0,
-    }
-
-
-def append_diagnostic_record(
-    output_dir: Union[str, Path], time_val: float, diag: Dict[str, Any]
-) -> None:
-    out_dir = Path(output_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    with (out_dir / "KE.dat").open("a", encoding="utf-8") as file:
-        file.write(f" {time_val:15.7f} {diag['KE']:15.7f}\n")
-    for filename, key in (
-        ("rhobulk.dat", "rhobulk"),
-        ("Ubulk.dat", "Ubulk"),
-        ("massflow.dat", "massflow"),
-    ):
-        with (out_dir / filename).open("a", encoding="utf-8") as file:
-            file.write(f" {time_val:15.7f}" + "".join(f" {value:15.7f}" for value in diag[key]) + "\n")
-    with (out_dir / "tauWall.dat").open("a", encoding="utf-8") as file:
-        file.write(
-            f" {time_val:15.7f} {diag['tau_bottom']:15.7f} {diag['tau_top']:15.7f}\n"
-        )
-
-
-def process_3d_snapshot(
-    snapshot_path: Union[str, Path],
-    output_dir: Union[str, Path] = "output_cuda",
-    append: bool = True,
-    use_gpu: bool = True,
-) -> Optional[Dict[str, Any]]:
-    path = Path(snapshot_path)
-    if not path.is_file():
-        print(f"    [!] Error: Snapshot file not found: {path}")
-        return None
-
-    time_val, nstep_val = 0.0, 0
-    nx, ny, nz = 130, 130, 160
-    with path.open("r", encoding="utf-8", errors="ignore") as file:
-        for _ in range(5):
-            line = file.readline()
-            if not line:
-                break
-            title_match = re.search(r'TITLE\s*=\s*"([^"]+)"', line, re.IGNORECASE)
-            if title_match:
-                tokens = title_match.group(1).split()
-                try:
-                    time_val = float(tokens[0])
-                    if len(tokens) > 1:
-                        nstep_val = int(tokens[1])
-                except (ValueError, IndexError):
-                    pass
-            dimensions = {
-                key: re.search(rf"{key}\s*=\s*(\d+)", line, re.IGNORECASE)
-                for key in ("i", "j", "k")
-            }
-            if all(dimensions.values()):
-                nx = int(dimensions["i"].group(1))
-                ny = int(dimensions["j"].group(1))
-                nz = int(dimensions["k"].group(1))
-
-    expected_cells = nx * ny * nz
-    try:
-        data = pd.read_csv(
-            path, skiprows=3, sep=r"\s+", header=None, comment="#",
-            on_bad_lines="skip", engine="c", dtype=np.float64,
-        )
-        if data.shape[0] < expected_cells or data.shape[1] < 9:
-            print(f"    [!] Snapshot '{path.name}' incomplete or has too few columns.")
-            return None
-        arr_3d = data.iloc[:expected_cells, :10].to_numpy().reshape(nz, ny, nx, -1)
-        y_coords = arr_3d[0, :, 0, 1]
-        z_coords = arr_3d[:, 0, 0, 2]
-        dy = float(y_coords[1] - y_coords[0]) if ny > 1 else (4.0 * math.pi / 3.0) / (ny - 1)
-        fields = [
-            np.transpose(arr_3d[..., index], (2, 1, 0))
-            for index in (3, 4, 5, 6, 8)
-        ]
-        rho, u, v, w, temperature = fields
-        if not np.isfinite(rho).all() or not np.isfinite(u).all():
-            print(f"    [!] Skipping snapshot '{path.name}': contains non-finite values.")
-            return None
-        diagnostics = calculate_diagnostics_cuda(
-            rho, u, v, w, temperature, z_coords, dy, use_gpu=use_gpu,
-        )
-        diagnostics.update(time=time_val, nstep=nstep_val, source=str(path))
-        if append:
-            append_diagnostic_record(output_dir, time_val, diagnostics)
-        return diagnostics
-    except Exception as exc:
-        print(f"    [!] Error processing snapshot '{path.name}': {exc}")
-        return None
-
-
-def process_snapshot_series(
-    directory: Union[str, Path] = "output_cuda",
-    output_dir: Optional[Union[str, Path]] = None,
-    pattern: str = "3D_step*.dat",
-    use_gpu: bool = True,
-) -> int:
-    source_dir = Path(directory)
-    destination_dir = Path(output_dir) if output_dir else source_dir
-    files = list(source_dir.glob(pattern))
-    if not files:
-        print(f"    [INFO] No snapshots found matching '{pattern}' in '{source_dir}'.")
-        return 0
-
-    def get_step(path: Path) -> int:
-        match = re.search(r"step(\d+)", path.name) or re.search(r"3D(\d+)", path.name)
-        return int(match.group(1)) if match else 0
-
-    files.sort(key=lambda path: (get_step(path), path.name))
-    print(f"\n[+] Batch processing {len(files)} snapshot(s) from '{source_dir}'...")
-    processed_count = 0
-    started = time.time()
-    for path in files:
-        sys.stdout.write(f"    Processing {path.name:<25}... ")
-        sys.stdout.flush()
-        diagnostics = process_3d_snapshot(
-            path, output_dir=destination_dir, append=True, use_gpu=use_gpu,
-        )
-        if diagnostics:
-            print(f"DONE (t={diagnostics['time']:.4f}, KE={diagnostics['KE']:.5f})")
-            processed_count += 1
-        else:
-            print("SKIPPED")
-    print(f"[+] Processed {processed_count} snapshot(s) in {time.time() - started:.2f} s.")
-    print(f"    Diagnostic files updated in: {destination_dir.resolve()}")
-    return processed_count
+calculate_diagnostics_cuda = cdc.calculate_diagnostics_cuda
+append_diagnostic_record = cdc.append_diagnostic_record
+process_3d_snapshot = cdc.process_3d_snapshot
+process_snapshot_series = cdc.process_snapshot_series
+compute_wall_coefficients = cdc.compute_wall_coefficients
 
 
 # ---------------------------------------------------------------------------
@@ -688,6 +391,8 @@ def measure_cuda_performance(
     mean_output: Optional[str] = None,
     tke_output: Optional[str] = None,
     diagnostics_use_gpu: bool = True,
+    param_file: str = "param.dat",
+    solver_overrides: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Dynamically executes the CUDA GPU solver live using time.perf_counter().
@@ -725,25 +430,27 @@ def measure_cuda_performance(
         else:
             print(f"    [!] --resume specified but no checkpoint found in '{output_file}'. Falling back to default initial condition.")
 
-    if not target_input:
-        for cand in ["input/3D.dat", "3D.dat", "../input/3D.dat"]:
-            if os.path.exists(cand):
-                target_input = cand
-                break
-
-    cfg = cuda_mod.SolverConfig(
-        nx=130, ny=130, nz=160,
-        reynolds=3000.0, mach=1.5, dt=1.0e-4,
-        max_steps=num_steps, statistic_frequency=max(num_steps, 1)
+    overrides = dict(solver_overrides or {})
+    overrides["steps"] = num_steps
+    live_stats_dir = overrides.pop("stats_dir", None)
+    live_ckpt_dir = overrides.pop("checkpoint_dir", None)
+    cfg, q0, time_init, nstep_init, loaded_source = cuda_mod.configure_and_load_state(
+        param_path=param_file,
+        input_file=target_input,
+        demo=False,
+        overrides=overrides,
+        fallback_to_demo=True,
+        default_nx=130,
+        default_ny=130,
+        default_nz=160,
+        default_re=3000.0,
+        default_mach=1.5,
+        default_dt=1.0e-4,
     )
-
-    if target_input and os.path.exists(target_input):
-        q0, time_init, nstep_init = cuda_mod.read_combined_input(target_input, cfg)
-        print(f"    Loaded input snapshot: {target_input} (Grid: {cfg.nx}x{cfg.ny}x{cfg.nz}, t={time_init:.4f}, step={nstep_init})")
-    else:
-        q0 = cuda_mod.demo_initial_condition(cfg)
-        time_init, nstep_init = 0.0, 0
+    if loaded_source == "demo":
         print("    Using synthetic demo state.")
+    else:
+        print(f"    Loaded input snapshot: {loaded_source} (Grid: {cfg.nx}x{cfg.ny}x{cfg.nz}, t={time_init:.4f}, step={nstep_init})")
 
     solver = cuda_mod.CUDASolver(cfg, q0)
     solver.time_value = time_init
@@ -755,14 +462,16 @@ def measure_cuda_performance(
 
     if not post_only and num_steps > 0:
         print(f"\n[+] Initializing CUDA GPU Solver ({num_steps} RK2 steps requested)...")
-        # Warm up CUDA JIT, then restore the loaded state so it is not counted.
+        # Warm up CUDA JIT with live stats/checkpoints detached so warmup never pollutes outputs.
         print("    Warming up Numba CUDA JIT kernels...")
         solver.step()
         cuda_mod.cuda.synchronize()
         solver.d_q.copy_to_device(np.ascontiguousarray(q0))
-        solver.update_primitive()
+        solver.reset_runtime_buffers()
         solver.time_value = time_init
         solver.nstep = nstep_init
+        solver.cfg.stats_dir = live_stats_dir
+        solver.cfg.checkpoint_dir = live_ckpt_dir
 
         # Time live execution loop
         t_start = time.perf_counter()
@@ -880,11 +589,12 @@ def measure_cuda_performance(
         u=u_cur,
         v=v_cur,
         w=w_cur,
-        temperature=temperature_cur,
+        T=temperature_cur,
         z_coords=solver.x3_h,
         dy=dy_cur,
         reynolds=cfg.reynolds,
         use_gpu=diagnostics_use_gpu,
+        dx=solver.dx,
     )
     append_diagnostic_record(out_target_dir or "output_cuda", solver.time_value, diag_results)
     print(f"    [+] Flow diagnostics computed for t={solver.time_value:.6f}:")
@@ -946,6 +656,8 @@ def run_benchmark(
     mean_output: Optional[str] = None,
     tke_output: Optional[str] = None,
     diagnostics_use_gpu: bool = True,
+    param_file: str = "param.dat",
+    solver_overrides: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Runs the CUDA GPU solver live, ingests mean profile, and outputs new results."""
     print("=" * 80)
@@ -968,6 +680,8 @@ def run_benchmark(
         mean_output=mean_output,
         tke_output=tke_output,
         diagnostics_use_gpu=diagnostics_use_gpu,
+        param_file=param_file,
+        solver_overrides=solver_overrides,
     )
 
     t_cuda = summary["step_time_sec"]
@@ -1113,6 +827,21 @@ def parse_args():
         "--no-gpu", action="store_true",
         help="Use CPU diagnostics instead of CUDA kernels (solver mode still requires CUDA).",
     )
+    p.add_argument("--param", default="param.dat", help="Path to param.dat (default: param.dat)")
+    p.add_argument("--mesh", choices=("auto", "cosine", "tanh"), default=None, help="Wall-normal grid stretching")
+    p.add_argument("--wall-order", type=int, choices=(2, 3), default=None, help="Wall derivative order (2=codes/, 3=codes1/)")
+    p.add_argument("--oc", type=int, choices=(0, 1), default=None, help="1=enable opposition control, 0=disable")
+    p.add_argument("--amp-v", type=float, default=None, help="Spanwise wall oscillation amplitude")
+    p.add_argument("--kappa", type=float, default=None, help="Actuation streamwise wavenumber")
+    p.add_argument("--omega", type=float, default=None, help="Actuation angular frequency")
+    p.add_argument("--dynamic-source", dest="dynamic_source", action="store_true", default=None, help="Enable dynamic GPU source updates")
+    p.add_argument("--no-dynamic-source", dest="dynamic_source", action="store_false", help="Disable dynamic GPU source updates")
+    p.add_argument("--stats-dir", default=None, help="Directory to stream live Fortran-parity .dat stats during stepping")
+    p.add_argument("--stats-mode", choices=("none", "minimal", "standard", "full"), default=None, help="Live statistics tier (default: standard)")
+    p.add_argument("--diag-freq", type=_positive_int, default=None, help="Live Diagnostic_files/PowSpec cadence in steps (default: 10)")
+    p.add_argument("--checkpoint-dir", default=None, help="Directory for rolling 3D.dat/3D_.dat or component checkpoints")
+    p.add_argument("--output-freq", type=_positive_int, default=None, help="Rolling checkpoint cadence in steps (default: 1000)")
+    p.add_argument("--checkpoint-components", action="store_true", default=None, help="Write rolling checkpoints as domInfo.txt + 3Dnnn.dat")
     return p.parse_args()
 
 
@@ -1150,6 +879,24 @@ def main():
             raise SystemExit(1)
         return
 
+    solver_overrides = {
+        k: getattr(args, k)
+        for k in (
+            "mesh",
+            "wall_order",
+            "oc",
+            "amp_v",
+            "kappa",
+            "omega",
+            "dynamic_source",
+            "stats_dir",
+            "stats_mode",
+            "diag_freq",
+            "checkpoint_dir",
+            "output_freq",
+            "checkpoint_components",
+        )
+    }
     run_benchmark(
         num_cuda_steps=args.steps,
         input_file=args.input,
@@ -1166,6 +913,8 @@ def main():
         mean_output=args.mean_output,
         tke_output=args.tke_output,
         diagnostics_use_gpu=not args.no_gpu,
+        param_file=args.param,
+        solver_overrides=solver_overrides,
     )
 
 

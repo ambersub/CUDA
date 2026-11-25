@@ -382,6 +382,8 @@ def measure_cuda_performance(
     rms_output: Optional[str] = None,
     mean_output: Optional[str] = None,
     tke_output: Optional[str] = None,
+    param_file: str = "param.dat",
+    solver_overrides: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Dynamically executes the CUDA GPU solver live using time.perf_counter().
@@ -414,25 +416,27 @@ def measure_cuda_performance(
         else:
             print(f"    [!] --resume specified but no checkpoint found in '{output_file}'. Falling back to default initial condition.")
 
-    if not target_input:
-        for cand in ["input/3D.dat", "3D.dat", "../input/3D.dat"]:
-            if os.path.exists(cand):
-                target_input = cand
-                break
-
-    cfg = cuda_mod.SolverConfig(
-        nx=130, ny=130, nz=160,
-        reynolds=3000.0, mach=1.5, dt=1.0e-4,
-        max_steps=num_steps, statistic_frequency=max(num_steps, 1)
+    overrides = dict(solver_overrides or {})
+    overrides["steps"] = num_steps
+    live_stats_dir = overrides.pop("stats_dir", None)
+    live_ckpt_dir = overrides.pop("checkpoint_dir", None)
+    cfg, q0, time_init, nstep_init, loaded_source = cuda_mod.configure_and_load_state(
+        param_path=param_file,
+        input_file=target_input,
+        demo=False,
+        overrides=overrides,
+        fallback_to_demo=True,
+        default_nx=130,
+        default_ny=130,
+        default_nz=160,
+        default_re=3000.0,
+        default_mach=1.5,
+        default_dt=1.0e-4,
     )
-
-    if target_input and os.path.exists(target_input):
-        q0, time_init, nstep_init = cuda_mod.read_combined_input(target_input, cfg)
-        print(f"    Loaded input snapshot: {target_input} (Grid: {cfg.nx}x{cfg.ny}x{cfg.nz}, t={time_init:.4f}, step={nstep_init})")
-    else:
-        q0 = cuda_mod.demo_initial_condition(cfg)
-        time_init, nstep_init = 0.0, 0
+    if loaded_source == "demo":
         print("    Using synthetic demo state.")
+    else:
+        print(f"    Loaded input snapshot: {loaded_source} (Grid: {cfg.nx}x{cfg.ny}x{cfg.nz}, t={time_init:.4f}, step={nstep_init})")
 
     solver = cuda_mod.CUDASolver(cfg, q0)
     solver.time_value = time_init
@@ -444,9 +448,16 @@ def measure_cuda_performance(
 
     if not post_only and num_steps > 0:
         print(f"\n[+] Initializing CUDA GPU Solver ({num_steps} RK2 steps requested)...")
-        # Warmup step to initialize Numba CUDA JIT kernels
+        # Warm up CUDA JIT with live stats/checkpoints detached so warmup never pollutes outputs.
         print("    Warming up Numba CUDA JIT kernels...")
         solver.step()
+        cuda_mod.cuda.synchronize()
+        solver.d_q.copy_to_device(np.ascontiguousarray(q0))
+        solver.reset_runtime_buffers()
+        solver.time_value = time_init
+        solver.nstep = nstep_init
+        solver.cfg.stats_dir = live_stats_dir
+        solver.cfg.checkpoint_dir = live_ckpt_dir
 
         # Time live execution loop
         cuda_mod.cuda.synchronize()
@@ -579,6 +590,7 @@ def measure_cuda_performance(
                 dy=dy_cur,
                 reynolds=cfg.reynolds,
                 use_gpu=True,
+                dx=solver.dx,
             )
             target_diag_dir = out_target_dir or "output_cuda"
             cdc.append_diagnostic_record(target_diag_dir, solver.time_value, diag_results)
@@ -640,6 +652,8 @@ def run_benchmark(
     rms_output: Optional[str] = None,
     mean_output: Optional[str] = None,
     tke_output: Optional[str] = None,
+    param_file: str = "param.dat",
+    solver_overrides: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Runs the CUDA GPU solver live, ingests mean profile, and outputs new results."""
     print("=" * 80)
@@ -661,6 +675,8 @@ def run_benchmark(
         rms_output=rms_output,
         mean_output=mean_output,
         tke_output=tke_output,
+        param_file=param_file,
+        solver_overrides=solver_overrides,
     )
 
     t_cuda = summary["step_time_sec"]
@@ -769,11 +785,44 @@ def parse_args():
         default=None,
         help="Custom destination for 1D TKE profile turb_KE.dat (default: output_cuda/turb_KE.dat)",
     )
+    p.add_argument("--param", default="param.dat", help="Path to param.dat (default: param.dat)")
+    p.add_argument("--mesh", choices=("auto", "cosine", "tanh"), default=None, help="Wall-normal grid stretching")
+    p.add_argument("--wall-order", type=int, choices=(2, 3), default=None, help="Wall derivative order (2=codes/, 3=codes1/)")
+    p.add_argument("--oc", type=int, choices=(0, 1), default=None, help="1=enable opposition control, 0=disable")
+    p.add_argument("--amp-v", type=float, default=None, help="Spanwise wall oscillation amplitude")
+    p.add_argument("--kappa", type=float, default=None, help="Actuation streamwise wavenumber")
+    p.add_argument("--omega", type=float, default=None, help="Actuation angular frequency")
+    p.add_argument("--dynamic-source", dest="dynamic_source", action="store_true", default=None, help="Enable dynamic GPU source updates")
+    p.add_argument("--no-dynamic-source", dest="dynamic_source", action="store_false", help="Disable dynamic GPU source updates")
+    p.add_argument("--stats-dir", default=None, help="Directory to stream live Fortran-parity .dat stats during stepping")
+    p.add_argument("--stats-mode", choices=("none", "minimal", "standard", "full"), default=None, help="Live statistics tier (default: standard)")
+    p.add_argument("--diag-freq", type=int, default=None, help="Live Diagnostic_files/PowSpec cadence in steps (default: 10)")
+    p.add_argument("--checkpoint-dir", default=None, help="Directory for rolling 3D.dat/3D_.dat or component checkpoints")
+    p.add_argument("--output-freq", type=int, default=None, help="Rolling checkpoint cadence in steps (default: 1000)")
+    p.add_argument("--checkpoint-components", action="store_true", default=None, help="Write rolling checkpoints as domInfo.txt + 3Dnnn.dat")
     return p.parse_args()
 
 
 def main():
     args = parse_args()
+    solver_overrides = {
+        k: getattr(args, k)
+        for k in (
+            "mesh",
+            "wall_order",
+            "oc",
+            "amp_v",
+            "kappa",
+            "omega",
+            "dynamic_source",
+            "stats_dir",
+            "stats_mode",
+            "diag_freq",
+            "checkpoint_dir",
+            "output_freq",
+            "checkpoint_components",
+        )
+    }
     run_benchmark(
         num_cuda_steps=args.steps,
         input_file=args.input,
@@ -789,6 +838,8 @@ def main():
         rms_output=args.rms_output,
         mean_output=args.mean_output,
         tke_output=args.tke_output,
+        param_file=args.param,
+        solver_overrides=solver_overrides,
     )
 
 
